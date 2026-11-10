@@ -7,6 +7,7 @@ import { CommonModule } from './common/common.module';
 import { PaymentIntentsModule } from './payment-intents/payment-intents.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AuditModule } from './audit/audit.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { AuditModule } from './audit/audit.module';
     PaymentIntentsModule,
     WebhooksModule,
     AuditModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

@@ -1,0 +1,9 @@
+import { Module } from '@nestjs/common';
+import { HealthController } from './health.controller';
+import { AuditModule } from '../audit/audit.module';
+
+@Module({
+  imports: [AuditModule],
+  controllers: [HealthController],
+})
+export class HealthModule {}
