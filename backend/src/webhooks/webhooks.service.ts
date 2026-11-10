@@ -4,12 +4,16 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaymentIntentCreatedEvent } from './events/payment-intent-created.event';
 import { createHmac, timingSafeEqual, randomUUID } from 'crypto';
 import { WebhookDeliveryStatus } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 
 @Injectable()
 export class WebhooksService {
   private readonly logger = new Logger(WebhooksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
   /**
    * Computes standardized cryptographic HMAC-SHA256 signature
@@ -128,7 +132,7 @@ export class WebhooksService {
       status = WebhookDeliveryStatus.RETRYING;
     }
 
-    // Persist delivery audit record in database
+    // Persist delivery audit record in database (PostgreSQL transactional)
     await this.prisma.webhookDelivery.create({
       data: {
         paymentIntentId: event.paymentIntent.id,
@@ -140,6 +144,19 @@ export class WebhooksService {
         signatureSent: signatureHeader,
         attemptCount: 1,
       },
+    });
+
+    // Persist high-volume raw JSON audit log in NoSQL store (MongoDB)
+    await this.auditService.recordWebhookAudit({
+      eventId: webhookPayload.id,
+      eventType,
+      merchantId: event.merchantId,
+      paymentIntentId: event.paymentIntent.id,
+      targetUrl,
+      payload: webhookPayload,
+      signatureSent: signatureHeader,
+      statusCode,
+      status,
     });
   }
 }

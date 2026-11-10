@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { CommonModule } from './common/common.module';
 import { PaymentIntentsModule } from './payment-intents/payment-intents.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     CommonModule,
     PaymentIntentsModule,
     WebhooksModule,
+    AuditModule,
   ],
 })
 export class AppModule {}

@@ -6,6 +6,7 @@ jest.mock('@nestjs/event-emitter', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksService } from './webhooks.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 
 describe('WebhooksService', () => {
   let service: WebhooksService;
@@ -19,6 +20,13 @@ describe('WebhooksService', () => {
           useValue: {
             merchant: { findUnique: jest.fn() },
             webhookDelivery: { create: jest.fn() },
+          },
+        },
+        {
+          provide: AuditService,
+          useValue: {
+            recordWebhookAudit: jest.fn(),
+            getMerchantAuditLogs: jest.fn(),
           },
         },
       ],
