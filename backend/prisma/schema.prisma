@@ -1,0 +1,81 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PaymentIntentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum WebhookDeliveryStatus {
+  DELIVERED
+  RETRYING
+  PERMANENTLY_FAILED
+}
+
+model Merchant {
+  id            String          @id @default(uuid())
+  name          String
+  apiKey        String          @unique @map("api_key")
+  webhookSecret String          @map("webhook_secret")
+  webhookUrl    String?         @map("webhook_url")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  paymentIntents PaymentIntent[]
+
+  @@map("merchants")
+}
+
+model PaymentIntent {
+  id             String               @id @default(uuid())
+  merchantId     String               @map("merchant_id")
+  amount         BigInt               // Stored in smallest currency units (e.g., 10000 XOF)
+  currency       String               @default("XOF")
+  reference      String
+  customerPhone  String               @map("customer_phone")
+  customerEmail  String?              @map("customer_email")
+  status         PaymentIntentStatus  @default(PENDING)
+  failureCode    String?              @map("failure_code")
+  failureMessage String?              @map("failure_message")
+  idempotencyKey String               @map("idempotency_key")
+  cachedResponse Json?                @map("cached_response")
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  merchant       Merchant             @relation(fields: [merchantId], references: [id], onDelete: Restrict)
+  deliveries     WebhookDelivery[]
+
+  // Strict database constraint preventing concurrent duplicate transactions
+  @@unique([merchantId, idempotencyKey], name: "uq_merchant_idempotency")
+  @@index([merchantId, createdAt(sort: Desc)])
+  @@index([reference])
+  @@map("payment_intents")
+}
+
+model WebhookDelivery {
+  id              String                @id @default(uuid())
+  paymentIntentId String                @map("payment_intent_id")
+  eventType       String                @map("event_type")
+  payload         Json
+  targetUrl       String                @map("target_url")
+  statusCode      Int?                  @map("status_code")
+  attemptCount    Int                   @default(1) @map("attempt_count")
+  status          WebhookDeliveryStatus @default(DELIVERED)
+  signatureSent   String                @map("signature_sent")
+  nextRetryAt     DateTime?             @map("next_retry_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+
+  paymentIntent   PaymentIntent         @relation(fields: [paymentIntentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentIntentId])
+  @@index([status])
+  @@map("webhook_deliveries")
+}
