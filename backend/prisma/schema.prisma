@@ -22,16 +22,35 @@ enum WebhookDeliveryStatus {
 }
 
 model Merchant {
-  id            String          @id @default(uuid())
-  name          String
-  apiKey        String          @unique @map("api_key")
-  webhookSecret String          @map("webhook_secret")
-  webhookUrl    String?         @map("webhook_url")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  paymentIntents PaymentIntent[]
+  id              String            @id @default(uuid())
+  name            String
+  apiKey          String            @unique @map("api_key")
+  webhookSecret   String            @map("webhook_secret")
+  webhookUrl      String?           @map("webhook_url")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+  paymentIntents  PaymentIntent[]
+  idempotencyKeys IdempotencyKey[]
 
   @@map("merchants")
+}
+
+model IdempotencyKey {
+  id             String    @id @default(uuid())
+  merchantId     String    @map("merchant_id")
+  key            String
+  payloadHash    String    @map("payload_hash")
+  status         String    @default("PROCESSING") // PROCESSING, RESOLVED, FAILED
+  responseStatus Int?      @map("response_status")
+  responseBody   Json?     @map("response_body")
+  lockedAt       DateTime  @default(now()) @map("locked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  merchant       Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, key], name: "uq_merchant_key")
+  @@index([merchantId, status])
+  @@map("idempotency_keys")
 }
 
 model PaymentIntent {

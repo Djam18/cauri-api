@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { ProblemDetailsFilter } from './common/filters/problem-details/problem-details.filter';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -22,6 +23,9 @@ async function bootstrap() {
   // API Global Prefix
   const globalPrefix = process.env.API_PREFIX || 'v1';
   app.setGlobalPrefix(globalPrefix);
+
+  // Global RFC 7807 Problem Details Filter
+  app.useGlobalFilters(new ProblemDetailsFilter());
 
   // Strict Global Validation Pipe
   app.useGlobalPipes(
