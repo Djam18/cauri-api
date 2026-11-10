@@ -1,14 +1,17 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { PaymentIntentCreatedEvent } from '../webhooks/events/payment-intent-created.event';
 import { PaymentIntentStatus } from '@prisma/client';
+import {
+  InsufficientFundsException,
+  CardOrAccountExpiredException,
+  RateLimitExceededException,
+  GatewayTimeoutException,
+  IdempotencyConflictException,
+  ResourceNotFoundException,
+} from '../common/exceptions/domain.exceptions';
 
 @Injectable()
 export class PaymentIntentsService {
@@ -24,32 +27,30 @@ export class PaymentIntentsService {
     idempotencyKey: string,
     dto: CreatePaymentIntentDto,
   ) {
-    const amountBigInt = BigInt(dto.amount);
-
     // =========================================================================
-    // DETERMINISTIC MAGIC VALUES SIMULATION ENGINE
+    // DOMAIN VALIDATION & DETERMINISTIC MAGIC VALUES SIMULATION
     // =========================================================================
-    let status: PaymentIntentStatus = PaymentIntentStatus.SUCCEEDED;
-    let failureCode: string | null = null;
-    let failureMessage: string | null = null;
-
     if (dto.amount === 4002) {
-      status = PaymentIntentStatus.FAILED;
-      failureCode = 'INSUFFICIENT_FUNDS';
-      failureMessage = 'The customer account or wallet does not have sufficient balance.';
-    } else if (dto.amount === 4003) {
-      status = PaymentIntentStatus.FAILED;
-      failureCode = 'CARD_OR_ACCOUNT_EXPIRED';
-      failureMessage = 'The selected payment method or mobile wallet session has expired.';
-    } else if (dto.amount === 4029) {
-      status = PaymentIntentStatus.FAILED;
-      failureCode = 'RATE_LIMIT_EXCEEDED';
-      failureMessage = 'The daily transaction threshold for this customer has been exceeded.';
-    } else if (dto.amount === 5004) {
-      status = PaymentIntentStatus.FAILED;
-      failureCode = 'GATEWAY_TIMEOUT';
-      failureMessage = 'Upstream telecom or bank network timed out after 30000ms.';
+      this.logger.warn(`Simulating domain failure: Insufficient funds for amount ${dto.amount}`);
+      throw new InsufficientFundsException(dto.amount, dto.currency);
     }
+
+    if (dto.amount === 4003) {
+      this.logger.warn(`Simulating domain failure: Card/account expired for amount ${dto.amount}`);
+      throw new CardOrAccountExpiredException();
+    }
+
+    if (dto.amount === 4029) {
+      this.logger.warn(`Simulating domain failure: Rate limit exceeded for amount ${dto.amount}`);
+      throw new RateLimitExceededException();
+    }
+
+    if (dto.amount === 5004) {
+      this.logger.warn(`Simulating domain failure: Gateway timeout for amount ${dto.amount}`);
+      throw new GatewayTimeoutException();
+    }
+
+    const amountBigInt = BigInt(dto.amount);
 
     try {
       const paymentIntent = await this.prisma.paymentIntent.create({
@@ -60,9 +61,9 @@ export class PaymentIntentsService {
           reference: dto.reference,
           customerPhone: dto.customerPhone,
           customerEmail: dto.customerEmail,
-          status,
-          failureCode,
-          failureMessage,
+          status: PaymentIntentStatus.SUCCEEDED,
+          failureCode: null,
+          failureMessage: null,
           idempotencyKey,
         },
       });
@@ -94,7 +95,7 @@ export class PaymentIntentsService {
         if (existing) {
           return this.formatResponse(existing);
         }
-        throw new ConflictException('Concurrent duplicate transaction in progress.');
+        throw new IdempotencyConflictException(idempotencyKey);
       }
       throw error;
     }
@@ -109,7 +110,7 @@ export class PaymentIntentsService {
     });
 
     if (!paymentIntent) {
-      throw new NotFoundException(`Payment intent '${id}' not found.`);
+      throw new ResourceNotFoundException('PaymentIntent', id);
     }
 
     return this.formatResponse(paymentIntent);
