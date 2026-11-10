@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: cauri-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: frankfurt
+    healthCheckPath: /docs
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: API_PREFIX
+        value: v1
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cauri-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+
+databases:
+  - name: cauri-db
+    databaseName: cauri_prod
+    user: cauri_admin
+    plan: free
+    region: frankfurt

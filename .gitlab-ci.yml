@@ -1,0 +1,71 @@
+# ==============================================================================
+# GITLAB CI/CD PIPELINE SPECIFICATION — CAURI BACKEND
+# ==============================================================================
+
+stages:
+  - lint
+  - test
+  - build
+  - package
+
+variables:
+  POSTGRES_DB: cauri_gitlab_test
+  POSTGRES_USER: test_user
+  POSTGRES_PASSWORD: test_password
+  POSTGRES_HOST_AUTH_METHOD: trust
+
+default:
+  image: node:22-alpine
+  before_script:
+    - cd backend
+    - npm ci
+
+# 1. Lint & TypeScript Strict Verification
+lint:typecheck:
+  stage: lint
+  script:
+    - npx prisma validate
+    - npx prisma generate
+    - npx tsc --noEmit
+
+# 2. Automated Test Suite with PostgreSQL Service Container
+test:unit:
+  stage: test
+  services:
+    - postgres:16-alpine
+  variables:
+    DATABASE_URL: "postgresql://test_user:test_password@postgres:5432/cauri_gitlab_test?schema=public"
+    PORT: 3000
+    JWT_SECRET: "gitlab_ci_test_secret_key"
+  script:
+    - npx prisma generate
+    - npm test -- --coverage
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/coverage/cobertura-coverage.xml
+
+# 3. Production NestJS Compilation
+build:production:
+  stage: build
+  script:
+    - npx prisma generate
+    - npm run build
+  artifacts:
+    paths:
+      - backend/dist/
+    expire_in: 1 week
+
+# 4. Multi-Stage Docker Container Build
+package:docker:
+  stage: package
+  image: docker:24-cli
+  services:
+    - docker:24-dind
+  before_script: []
+  script:
+    - docker build -t cauri-api:$CI_COMMIT_SHA -f backend/Dockerfile backend/
+  only:
+    - main
