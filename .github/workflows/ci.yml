@@ -1,78 +1,65 @@
-name: Cauri CI Pipeline
+name: Cauri Backend CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/*']
   pull_request:
     branches: [main]
 
 jobs:
-  lint-and-build:
-    name: Lint, Typecheck & Build
+  test-and-verify:
+    name: Lint, Test, Build & Docker Verification
     runs-on: ubuntu-latest
+
+    # Service Container: GitHub launches real PostgreSQL 16 instance for integration testing
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: cauri_test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
     defaults:
       run:
         working-directory: backend
+
     steps:
-      - name: Checkout Codebase
+      - name: 📥 Checkout Codebase
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20.x
+      - name: ⚙️ Setup Node.js 22 LTS
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
-          cache-dependency-path: backend/package.json
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install Dependencies
+      - name: 📦 Install Dependencies
         run: npm ci
 
-      - name: Generate Prisma Client
-        run: npx prisma generate
+      - name: 🔍 Prisma Schema Validation & Generation
+        run: |
+          npx prisma validate
+          npx prisma generate
 
-      - name: Compile & Build NestJS Project
+      - name: 🧪 Execute Automated Test Suite (Jest + RFC 7807)
+        env:
+          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/cauri_test_db?schema=public"
+          JWT_SECRET: "ci_super_secret_test_key_123456"
+          PORT: 3000
+        run: npm test -- --coverage
+
+      - name: 🏗️ Verify NestJS Production Compilation
         run: npm run build
 
-  test-suite:
-    name: Unit & Domain Integration Tests
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - name: Checkout Codebase
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 20.x
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: backend/package.json
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npx prisma generate
-
-      - name: Execute Jest Test Suite
-        run: npm test
-
-  docker-verification:
-    name: Dockerfile Build Verification
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Codebase
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: actions/setup-buildx-action@v3
-
-      - name: Build Backend Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: false
-          tags: cauri-api:ci-test
+      - name: 🐳 Verify Multi-Stage Docker Build
+        working-directory: .
+        run: docker build -t cauri-api:test -f backend/Dockerfile backend/
