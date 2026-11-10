@@ -1,0 +1,79 @@
+version: '3.8'
+
+# ==============================================================================
+# CAURI SANDBOX API — OFFICIAL REPOSITORY DOCKER COMPOSE
+# Self-contained for clone-and-run evaluation (P99 < 40ms, Zero-setup)
+# ==============================================================================
+
+services:
+  cauri-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cauri_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - API_PREFIX=v1
+      - DATABASE_URL=postgresql://cauri_user:cauri_password_secret@postgres:5432/cauri_db?schema=public
+      - MONGO_URI=mongodb://mongo:27017/cauri_audit
+      - RATE_LIMIT_TTL=60
+      - RATE_LIMIT_LIMIT=60
+      - WEBHOOK_TIMEOUT_MS=5000
+      - WEBHOOK_TOLERANCE_SECONDS=300
+      - DEMO_MERCHANT_ID=mch_0182ab91-ca91-42ab-8901-cauri0000001
+      - DEMO_API_KEY=sk_test_demo123
+      - DEMO_WEBHOOK_SECRET=whsec_cauri_secret_demo456
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_started
+    networks:
+      - cauri-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: cauri_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cauri_user
+      POSTGRES_PASSWORD: cauri_password_secret
+      POSTGRES_DB: cauri_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - cauri_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cauri_user -d cauri_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cauri-network
+
+  mongo:
+    image: mongo:7-jammy
+    container_name: cauri_mongo
+    restart: unless-stopped
+    environment:
+      - GLIBC_TUNABLES=glibc.pthread.rseq=1
+      - MONGO_INITDB_DATABASE=cauri_audit
+    ports:
+      - "27018:27017"
+    volumes:
+      - cauri_mongodata:/data/db
+    networks:
+      - cauri-network
+
+networks:
+  cauri-network:
+    name: cauri-network
+    driver: bridge
+
+volumes:
+  cauri_pgdata:
+  cauri_mongodata:
