@@ -1,6 +1,6 @@
 # ⚡ Cauri — Payment Sandbox API & Webhook Engine
 
-[![CI Pipeline](https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions)](https://github.com/Djam18/cauri-api)
+[![CI Pipeline](https://github.com/Djam18/cauri-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Djam18/cauri-api/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x_Strict-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![NestJS](https://img.shields.io/badge/NestJS-v11%2B-ea2849?style=flat-square&logo=nestjs)](https://nestjs.com/)
 [![Prisma](https://img.shields.io/badge/Prisma-v7%2B-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io/)
