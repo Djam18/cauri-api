@@ -11,6 +11,11 @@ jobs:
     name: Lint, Test, Build & Docker Verification
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/cauri_test_db?schema=public"
+      JWT_SECRET: "ci_super_secret_test_key_123456"
+      PORT: 3000
+
     # Service Container: GitHub launches real PostgreSQL 16 instance for integration testing
     services:
       postgres:
@@ -51,10 +56,6 @@ jobs:
           npx prisma generate
 
       - name: 🧪 Execute Automated Test Suite (Jest + RFC 7807)
-        env:
-          DATABASE_URL: "postgresql://test_user:test_password@localhost:5432/cauri_test_db?schema=public"
-          JWT_SECRET: "ci_super_secret_test_key_123456"
-          PORT: 3000
         run: npm test -- --coverage
 
       - name: 🏗️ Verify NestJS Production Compilation
