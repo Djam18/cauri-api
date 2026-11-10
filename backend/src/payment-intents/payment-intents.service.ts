@@ -9,6 +9,8 @@ import {
   CardOrAccountExpiredException,
   RateLimitExceededException,
   GatewayTimeoutException,
+  CustomerCancelledException,
+  UssdTimeoutException,
   IdempotencyConflictException,
   ResourceNotFoundException,
 } from '../common/exceptions/domain.exceptions';
@@ -29,7 +31,25 @@ export class PaymentIntentsService {
   ) {
     // =========================================================================
     // DOMAIN VALIDATION & DETERMINISTIC MAGIC VALUES SIMULATION
+    // (Amount Triggers & Mobile Money USSD Virtual Phone Number Triggers)
     // =========================================================================
+    // 1. Mobile Money Virtual Phone Number Triggers (MTN MoMo, Moov, Orange)
+    if (dto.customerPhone && dto.customerPhone.endsWith('0002')) {
+      this.logger.warn(`Simulating Mobile Money USSD decline on ${dto.customerPhone}`);
+      throw new CustomerCancelledException();
+    }
+
+    if (dto.customerPhone && dto.customerPhone.endsWith('0003')) {
+      this.logger.warn(`Simulating Mobile Money USSD prompt timeout on ${dto.customerPhone}`);
+      throw new UssdTimeoutException();
+    }
+
+    if (dto.customerPhone && dto.customerPhone.endsWith('0004')) {
+      this.logger.warn(`Simulating Mobile Money insufficient wallet balance on ${dto.customerPhone}`);
+      throw new InsufficientFundsException(dto.amount, dto.currency);
+    }
+
+    // 2. Amount Magic Values Triggers
     if (dto.amount === 4002) {
       this.logger.warn(`Simulating domain failure: Insufficient funds for amount ${dto.amount}`);
       throw new InsufficientFundsException(dto.amount, dto.currency);

@@ -14,6 +14,8 @@ import {
   CardOrAccountExpiredException,
   RateLimitExceededException,
   GatewayTimeoutException,
+  CustomerCancelledException,
+  UssdTimeoutException,
   MissingIdempotencyKeyException,
   IdempotencyConflictException,
   IdempotencyPayloadMismatchException,
@@ -49,8 +51,13 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         status = HttpStatus.BAD_REQUEST; // 400
       } else if (exception instanceof RateLimitExceededException) {
         status = HttpStatus.TOO_MANY_REQUESTS; // 429
-      } else if (exception instanceof GatewayTimeoutException) {
+      } else if (
+        exception instanceof GatewayTimeoutException ||
+        exception instanceof UssdTimeoutException
+      ) {
         status = HttpStatus.GATEWAY_TIMEOUT; // 504
+      } else if (exception instanceof CustomerCancelledException) {
+        status = HttpStatus.BAD_REQUEST; // 400
       } else if (exception instanceof IdempotencyConflictException) {
         status = HttpStatus.CONFLICT; // 409
       } else if (exception instanceof IdempotencyPayloadMismatchException) {

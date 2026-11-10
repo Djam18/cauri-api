@@ -13,6 +13,8 @@ import {
   GatewayTimeoutException,
   CardOrAccountExpiredException,
   RateLimitExceededException,
+  CustomerCancelledException,
+  UssdTimeoutException,
   ResourceNotFoundException,
 } from '../common/exceptions/domain.exceptions';
 
@@ -118,6 +120,28 @@ describe('PaymentIntentsService', () => {
         customerPhone: '+2290166646310',
       }),
     ).rejects.toThrow(GatewayTimeoutException);
+  });
+
+  it('should throw CustomerCancelledException when virtual phone number ends with 0002', async () => {
+    await expect(
+      service.create('mch_test', 'req_006', {
+        amount: 5000,
+        currency: 'XOF',
+        reference: 'CMD-6',
+        customerPhone: '+22997000002',
+      }),
+    ).rejects.toThrow(CustomerCancelledException);
+  });
+
+  it('should throw UssdTimeoutException when virtual phone number ends with 0003', async () => {
+    await expect(
+      service.create('mch_test', 'req_007', {
+        amount: 5000,
+        currency: 'XOF',
+        reference: 'CMD-7',
+        customerPhone: '+22997000003',
+      }),
+    ).rejects.toThrow(UssdTimeoutException);
   });
 
   it('should throw ResourceNotFoundException when payment intent is not found', async () => {

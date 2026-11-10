@@ -51,6 +51,24 @@ export class GatewayTimeoutException extends DomainException {
   }
 }
 
+export class CustomerCancelledException extends DomainException {
+  constructor() {
+    super(
+      'Customer actively cancelled or rejected the USSD authorization prompt on their mobile device.',
+      'USER_CANCELLED',
+    );
+  }
+}
+
+export class UssdTimeoutException extends DomainException {
+  constructor() {
+    super(
+      'USSD push session timed out. Customer did not enter their Mobile Money PIN within the 60-second window.',
+      'USSD_TIMEOUT',
+    );
+  }
+}
+
 export class MissingIdempotencyKeyException extends DomainException {
   constructor() {
     super(
