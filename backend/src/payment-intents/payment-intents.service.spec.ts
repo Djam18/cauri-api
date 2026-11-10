@@ -8,6 +8,13 @@ import { PaymentIntentsService } from './payment-intents.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PaymentIntentStatus } from '@prisma/client';
+import {
+  InsufficientFundsException,
+  GatewayTimeoutException,
+  CardOrAccountExpiredException,
+  RateLimitExceededException,
+  ResourceNotFoundException,
+} from '../common/exceptions/domain.exceptions';
 
 describe('PaymentIntentsService', () => {
   let service: PaymentIntentsService;
@@ -45,6 +52,7 @@ describe('PaymentIntentsService', () => {
     }).compile();
 
     service = module.get<PaymentIntentsService>(PaymentIntentsService);
+    jest.clearAllMocks();
   });
 
   it('should be defined', () => {
@@ -68,27 +76,55 @@ describe('PaymentIntentsService', () => {
     );
   });
 
-  it('should trigger INSUFFICIENT_FUNDS on magic value 4002', async () => {
-    const result = await service.create('mch_test', 'req_002', {
-      amount: 4002,
-      currency: 'XOF',
-      reference: 'CMD-2',
-      customerPhone: '+2290166646310',
-    });
-
-    expect(result.status).toBe(PaymentIntentStatus.FAILED);
-    expect(result.failure_code).toBe('INSUFFICIENT_FUNDS');
+  it('should throw InsufficientFundsException on magic value 4002', async () => {
+    await expect(
+      service.create('mch_test', 'req_002', {
+        amount: 4002,
+        currency: 'XOF',
+        reference: 'CMD-2',
+        customerPhone: '+2290166646310',
+      }),
+    ).rejects.toThrow(InsufficientFundsException);
   });
 
-  it('should trigger GATEWAY_TIMEOUT on magic value 5004', async () => {
-    const result = await service.create('mch_test', 'req_003', {
-      amount: 5004,
-      currency: 'XOF',
-      reference: 'CMD-3',
-      customerPhone: '+2290166646310',
-    });
+  it('should throw CardOrAccountExpiredException on magic value 4003', async () => {
+    await expect(
+      service.create('mch_test', 'req_003', {
+        amount: 4003,
+        currency: 'XOF',
+        reference: 'CMD-3',
+        customerPhone: '+2290166646310',
+      }),
+    ).rejects.toThrow(CardOrAccountExpiredException);
+  });
 
-    expect(result.status).toBe(PaymentIntentStatus.FAILED);
-    expect(result.failure_code).toBe('GATEWAY_TIMEOUT');
+  it('should throw RateLimitExceededException on magic value 4029', async () => {
+    await expect(
+      service.create('mch_test', 'req_004', {
+        amount: 4029,
+        currency: 'XOF',
+        reference: 'CMD-4',
+        customerPhone: '+2290166646310',
+      }),
+    ).rejects.toThrow(RateLimitExceededException);
+  });
+
+  it('should throw GatewayTimeoutException on magic value 5004', async () => {
+    await expect(
+      service.create('mch_test', 'req_005', {
+        amount: 5004,
+        currency: 'XOF',
+        reference: 'CMD-5',
+        customerPhone: '+2290166646310',
+      }),
+    ).rejects.toThrow(GatewayTimeoutException);
+  });
+
+  it('should throw ResourceNotFoundException when payment intent is not found', async () => {
+    mockPrisma.paymentIntent.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOne('mch_test', 'pi_non_existent')).rejects.toThrow(
+      ResourceNotFoundException,
+    );
   });
 });

@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { IdempotencyInterceptor } from './idempotency.interceptor';
 import { PrismaService } from '../../../prisma/prisma.service';
-import {
-  BadRequestException,
-  ConflictException,
-  UnprocessableEntityException,
-} from '@nestjs/common';
 import { of } from 'rxjs';
 import { createHash } from 'crypto';
+import {
+  MissingIdempotencyKeyException,
+  IdempotencyPayloadMismatchException,
+  IdempotencyConflictException,
+} from '../../exceptions/domain.exceptions';
 
 describe('IdempotencyInterceptor', () => {
   let interceptor: IdempotencyInterceptor;
@@ -57,13 +57,13 @@ describe('IdempotencyInterceptor', () => {
     };
   };
 
-  it('should throw BadRequestException if Idempotency-Key header is missing', async () => {
+  it('should throw MissingIdempotencyKeyException if Idempotency-Key header is missing', async () => {
     const { switchToHttp } = createMockContext({});
     const next = { handle: () => of('result') };
 
     await expect(
       interceptor.intercept({ switchToHttp } as any, next),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toThrow(MissingIdempotencyKeyException);
   });
 
   it('should replay cached response with HIT header if record is RESOLVED', async () => {
@@ -89,7 +89,7 @@ describe('IdempotencyInterceptor', () => {
     expect(result).toEqual({ id: 'pi_1', status: 'SUCCEEDED' });
   });
 
-  it('should throw UnprocessableEntityException if same key is reused with a different payload', async () => {
+  it('should throw IdempotencyPayloadMismatchException if same key is reused with a different payload', async () => {
     const originalBody = { amount: 10000 };
     const originalPayloadHash = createHash('sha256').update(JSON.stringify(originalBody)).digest('hex');
 
@@ -107,10 +107,10 @@ describe('IdempotencyInterceptor', () => {
 
     await expect(
       interceptor.intercept({ switchToHttp } as any, next),
-    ).rejects.toThrow(UnprocessableEntityException);
+    ).rejects.toThrow(IdempotencyPayloadMismatchException);
   });
 
-  it('should throw ConflictException if previous request is still in-flight (PROCESSING)', async () => {
+  it('should throw IdempotencyConflictException if previous request is still in-flight (PROCESSING)', async () => {
     const body = { amount: 10000 };
     const payloadHash = createHash('sha256').update(JSON.stringify(body)).digest('hex');
 
@@ -126,6 +126,6 @@ describe('IdempotencyInterceptor', () => {
 
     await expect(
       interceptor.intercept({ switchToHttp } as any, next),
-    ).rejects.toThrow(ConflictException);
+    ).rejects.toThrow(IdempotencyConflictException);
   });
 });

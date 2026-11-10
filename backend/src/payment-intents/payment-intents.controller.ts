@@ -5,7 +5,6 @@ import {
   Body,
   Param,
   Headers,
-  Req,
   UseGuards,
   UseInterceptors,
   HttpCode,
@@ -23,7 +22,8 @@ import { PaymentIntentsService } from './payment-intents.service';
 import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 import { ApiKeyGuard } from '../common/guards/api-key/api-key.guard';
 import { IdempotencyInterceptor } from '../common/interceptors/idempotency/idempotency.interceptor';
-import { Request } from 'express';
+import { CurrentMerchant } from '../common/decorators/current-merchant.decorator';
+import { Merchant } from '@prisma/client';
 
 @ApiTags('Payment Intents')
 @ApiBearerAuth('api-key')
@@ -52,18 +52,29 @@ export class PaymentIntentsController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Invalid DTO payload or missing Idempotency-Key header (RFC 7807)',
+    description: 'Validation error, insufficient funds (4002) or missing idempotency key (RFC 7807)',
   })
   @ApiResponse({
     status: 401,
     description: 'Missing or invalid Bearer API key',
   })
+  @ApiResponse({
+    status: 409,
+    description: 'Concurrent request conflict for the given idempotency key',
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Idempotency key payload mismatch',
+  })
+  @ApiResponse({
+    status: 504,
+    description: 'Simulated upstream gateway timeout (5004)',
+  })
   async create(
-    @Req() req: Request,
+    @CurrentMerchant() merchant: Merchant,
     @Headers('idempotency-key') idempotencyKey: string,
     @Body() dto: CreatePaymentIntentDto,
   ) {
-    const merchant = (req as any).merchant;
     return this.paymentIntentsService.create(merchant.id, idempotencyKey, dto);
   }
 
@@ -83,10 +94,9 @@ export class PaymentIntentsController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Payment intent not found for this merchant',
+    description: 'Payment intent not found for this merchant (RFC 7807)',
   })
-  async findOne(@Req() req: Request, @Param('id') id: string) {
-    const merchant = (req as any).merchant;
+  async findOne(@CurrentMerchant() merchant: Merchant, @Param('id') id: string) {
     return this.paymentIntentsService.findOne(merchant.id, id);
   }
 }
